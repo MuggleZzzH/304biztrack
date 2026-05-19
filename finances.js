@@ -1,12 +1,12 @@
 
-function openSidebar() {
-    var side = document.getElementById('sidebar');
-    side.style.display = (side.style.display === "block") ? "none" : "block";
-}
+// function openSidebar() {
+//     var side = document.getElementById('sidebar');
+//     side.style.display = (side.style.display === "block") ? "none" : "block";
+// }
 
-function closeSidebar() {
-    document.getElementById('sidebar').style.display = 'none';
-}
+// function closeSidebar() {
+//     document.getElementById('sidebar').style.display = 'none';
+// }
 
 
 function openForm() {
@@ -142,8 +142,31 @@ function addOrUpdate(event) {
         const trId = document.getElementById("tr-id").value;
         updateTransaction(trId);
     }
+
+    return Math.max(currentMax, normalizedId);
+  }, 0);
+
+  return maxId + 1;
 }
 
+/**
+ * Finds the next unused transaction ID given a set of already-used IDs.
+ *
+ * Data migration rationale:
+ * This helper is used when repairing persisted localStorage data. If a record
+ * has a duplicate or invalid ID, it receives the next unused positive integer.
+ * The algorithm is deterministic and preserves as many original IDs as
+ * possible.
+ *
+ * @param {Set<number>} usedIds - IDs that are already assigned.
+ * @returns {number} The next unused positive integer ID.
+ */
+function getNextUnusedTransactionId(usedIds) {
+  let candidateId = 1;
+
+  while (usedIds.has(candidateId)) {
+    candidateId += 1;
+  }
 
 function newTransaction(event) {
     event.preventDefault();
@@ -173,50 +196,132 @@ function newTransaction(event) {
     document.getElementById("transaction-form").reset();
 }
 
+function newTransaction(event) {
+  event.preventDefault();
+
+  const trDate = document.getElementById("tr-date").value;
+  const trCategory = document.getElementById("tr-category").value;
+  const trAmount = parseFloat(document.getElementById("tr-amount").value);
+  const trNotes = document.getElementById("tr-notes").value;
+
+  /*
+   * DATA INTEGRITY FIX:
+   * The original implementation used `transactions.length + 1`, which can
+   * create duplicate IDs after a middle record is deleted. The revised
+   * implementation derives the next ID from the maximum existing valid ID.
+   */
+  const trID = getNextTransactionId(transactions);
+
+  const transaction = {
+    trID,
+    trDate,
+    trCategory,
+    trAmount,
+    trNotes,
+  };
+
+  transactions.push(transaction);
+
+  /*
+   * Defensive step:
+   * Although getNextTransactionId() should produce a unique ID, the list is
+   * normalized again before persistence. This protects the application if
+   * localStorage was modified externally while the page was open.
+   */
+  transactions = ensureUniqueTransactionIds(transactions);
+  saveTransactions(transactions);
+
+  renderTransactions(transactions);
+
+  document.getElementById("transaction-form").reset();
+}
 
 function renderTransactions(transactions) {
-    const transactionTableBody = document.getElementById("tableBody");
-    transactionTableBody.innerHTML = "";
+  const transactionTableBody = document.getElementById("tableBody");
 
-    const transactionToRender = transactions;
+  /*
+   * SECURITY FIX:
+   * The original transaction table was generated with `innerHTML`, and
+   * transaction notes are free-text user input. Rendering notes through
+   * innerHTML allows user-provided markup to be parsed as HTML.
+   *
+   * This implementation uses DOM API construction and textContent-based cells
+   * so that notes such as `<img src=x onerror=alert(1)>` are displayed as text
+   * rather than executed.
+   */
+  BizTrackSafeDOM.clearElement(transactionTableBody);
 
-    transactionToRender.forEach(transaction => {
-        const transactionRow = document.createElement("tr");
-        transactionRow.className = "transaction-row";
+  transactions.forEach((transaction) => {
+    const transactionRow = document.createElement("tr");
+    transactionRow.className = "transaction-row";
 
-        transactionRow.dataset.trID = transaction.trID;
-        transactionRow.dataset.trDate = transaction.trDate;
-        transactionRow.dataset.trCategory = transaction.trCategory;
-        transactionRow.dataset.trAmount = transaction.trAmount;
-        transactionRow.dataset.trNotes = transaction.trNotes;
+    transactionRow.dataset.trID = transaction.trID;
+    transactionRow.dataset.trDate = transaction.trDate;
+    transactionRow.dataset.trCategory = transaction.trCategory;
+    transactionRow.dataset.trAmount = transaction.trAmount;
+    transactionRow.dataset.trNotes = transaction.trNotes;
 
-        const formattedAmount = typeof transaction.trAmount === 'number' ? `$${transaction.trAmount.toFixed(2)}` : '';
+    BizTrackSafeDOM.appendTextCell(transactionRow, transaction.trID);
+    BizTrackSafeDOM.appendTextCell(transactionRow, transaction.trDate);
+    BizTrackSafeDOM.appendTextCell(transactionRow, transaction.trCategory);
+    BizTrackSafeDOM.appendTextCell(
+      transactionRow,
+      BizTrackSafeDOM.formatCurrency(transaction.trAmount),
+      "tr-amount"
+    );
+    BizTrackSafeDOM.appendTextCell(transactionRow, transaction.trNotes);
 
-        transactionRow.innerHTML = `
-            <td>${transaction.trID}</td>
-            <td>${transaction.trDate}</td>
-            <td>${transaction.trCategory}</td>
-            <td class="tr-amount">${formattedAmount}</td>
-            <td>${transaction.trNotes}</td>
-            <td class="action">
-                <i title="Edit" onclick="editRow('${transaction.trID}')" class="edit-icon fa-solid fa-pen-to-square"></i>
-                <i onclick="deleteTransaction('${transaction.trID}')" class="delete-icon fas fa-trash-alt"></i>
-            </td> 
-        `;
-        transactionTableBody.appendChild(transactionRow);
+    /*
+     * SECURITY FIX:
+     * The previous action icons used dynamically generated inline onclick
+     * handlers. Event listeners avoid embedding transaction IDs inside HTML
+     * or JavaScript strings.
+     */
+    const editButton = BizTrackSafeDOM.createIconButton({
+      label: `Edit expense ${BizTrackSafeDOM.toDisplayText(transaction.trID)}`,
+      title: "Edit",
+      iconClassName: "fa-solid fa-pen-to-square",
+      className: "icon-button edit-icon",
+      onClick: () => editRow(transaction.trID),
+    });
+
+    const deleteButton = BizTrackSafeDOM.createIconButton({
+      label: `Delete expense ${BizTrackSafeDOM.toDisplayText(transaction.trID)}`,
+      title: "Delete",
+      iconClassName: "fas fa-trash-alt",
+      className: "icon-button delete-icon",
+      onClick: () => deleteTransaction(transaction.trID),
+    });
+
+    BizTrackSafeDOM.appendActionCell(transactionRow, [
+      editButton,
+      deleteButton,
+    ]);
+
+    transactionTableBody.appendChild(transactionRow);
   });
+
   displayExpenses();
 }
 
+
 function displayExpenses() {
-    const resultElement = document.getElementById("total-expenses");
+  const resultElement = document.getElementById("total-expenses");
 
-    const totalExpenses = transactions
-        .reduce((total, transaction) => total + transaction.trAmount,0);
+  /*
+   * SECURITY FIX:
+   * Summary output is rendered using textContent-based DOM construction for
+   * consistency with the safer rendering model adopted across the CRUD pages.
+   */
+  const totalExpenses = transactions.reduce(
+    (total, transaction) => total + Number(transaction.trAmount || 0),
+    0
+  );
 
-    resultElement.innerHTML = `
-        <span>Total Expenses: $${totalExpenses.toFixed(2)}</span>
-    `;
+  BizTrackSafeDOM.setSingleTextSpan(
+    resultElement,
+    `Total Expenses: $${totalExpenses.toFixed(2)}`
+  );
 }
 
 function editRow(trID) {
@@ -244,7 +349,17 @@ function editRow(trID) {
 
     document.getElementById("transaction-form").style.display = "block";
   }
-  
+
+  document.getElementById("tr-id").value = trToEdit.trID;
+  document.getElementById("tr-date").value = trToEdit.trDate;
+  document.getElementById("tr-category").value = trToEdit.trCategory;
+  document.getElementById("tr-amount").value = trToEdit.trAmount;
+  document.getElementById("tr-notes").value = trToEdit.trNotes;
+
+  document.getElementById("submitBtn").textContent = "Update";
+  document.getElementById("transaction-form").style.display = "block";
+}
+
 function deleteTransaction(trID) {
     const normalizedId = normalizeTransactionId(trID);
 
@@ -255,8 +370,9 @@ function deleteTransaction(trID) {
 
     const indexToDelete = transactions.findIndex(transaction => normalizeTransactionId(transaction.trID) === normalizedId);
 
-    if (indexToDelete !== -1) {
-        transactions.splice(indexToDelete, 1);
+  const indexToDelete = transactions.findIndex(
+    (transaction) => normalizeTransactionId(transaction.trID) === normalizedId
+  );
 
         saveTransactions(transactions);
         renderTransactions(transactions);
@@ -282,16 +398,17 @@ function updateTransaction(trID) {
             trNotes: document.getElementById("tr-notes").value,
         };
 
-        transactions[indexToUpdate] = updatedTransaction;
+    transactions[indexToUpdate] = updatedTransaction;
 
         transactions = ensureUniqueTransactionIds(transactions);
         saveTransactions(transactions);
         renderTransactions(transactions);
 
-        document.getElementById("transaction-form").reset();
-        document.getElementById("submitBtn").textContent = "Add";
-    }
+    document.getElementById("transaction-form").reset();
+    document.getElementById("submitBtn").textContent = "Add";
+  }
 }
+
 
 function sortTable(column) {
     const tbody = document.getElementById("tableBody");
@@ -335,33 +452,44 @@ function performSearch() {
 
 
 function exportToCSV() {
-    const transactionsToExport = transactions.map(transaction => {
-        return {
-            trID: transaction.trID,
-            trDate: transaction.trDate,
-            trCategory: transaction.trCategory,
-            trAmount: transaction.trAmount.toFixed(2),
-            trNotes: transaction.trNotes,
-        };
-    });
-  
-    const csvContent = generateCSV(transactionsToExport);
-  
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-  
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = 'biztrack_expense_table.csv';
-  
-    document.body.appendChild(link);
-    link.click();
-  
-    document.body.removeChild(link);
-}
-  
-function generateCSV(data) {
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(order => Object.values(order).join(','));
+  /*
+   * CSV ROBUSTNESS FIX:
+   * The original expense export inferred headers from data[0], so exporting
+   * an empty transaction list caused a runtime error. Explicit column
+   * definitions allow the application to export a valid header-only CSV.
+   */
+  const transactionColumns = [
+    {
+      header: "Transaction ID",
+      value: (transaction) => transaction.trID,
+    },
+    {
+      header: "Date",
+      value: (transaction) => transaction.trDate,
+    },
+    {
+      header: "Expense Category",
+      value: (transaction) => transaction.trCategory,
+    },
+    {
+      header: "Amount",
+      value: (transaction) => Number(transaction.trAmount || 0).toFixed(2),
+    },
+    {
+      header: "Notes",
+      value: (transaction) => transaction.trNotes,
+    },
+  ];
 
-    return `${headers}\n${rows.join('\n')}`;
+  /*
+   * SECURITY FIX:
+   * Transaction notes are free-text user input. The shared CSV utility ensures
+   * that commas, quotes, line breaks, and formula-like prefixes are handled
+   * consistently before the file is downloaded.
+   */
+  BizTrackCSV.exportRecordsToCSV({
+    filename: "biztrack_expense_table.csv",
+    records: transactions,
+    columns: transactionColumns,
+  });
 }
