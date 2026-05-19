@@ -250,33 +250,17 @@ function performSearch() {
 
 
 function exportToCSV() {
-    const transactionsToExport = transactions.map(transaction => {
-        return {
-            trID: transaction.trID,
-            trDate: transaction.trDate,
-            trCategory: transaction.trCategory,
-            trAmount: transaction.trAmount.toFixed(2),
-            trNotes: transaction.trNotes,
-        };
-    });
-  
-    const csvContent = generateCSV(transactionsToExport);
-  
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-  
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = 'biztrack_expense_table.csv';
-  
-    document.body.appendChild(link);
-    link.click();
-  
-    document.body.removeChild(link);
-}
-  
-function generateCSV(data) {
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(order => Object.values(order).join(','));
+    const transactionColumns = [
+        { header: "Transaction ID", value: (transaction) => transaction.trID },
+        { header: "Date", value: (transaction) => transaction.trDate },
+        { header: "Expense Category", value: (transaction) => transaction.trCategory },
+        { header: "Amount", value: (transaction) => Number(transaction.trAmount || 0).toFixed(2) },
+        { header: "Notes", value: (transaction) => transaction.trNotes },
+    ];
 
-    return `${headers}\n${rows.join('\n')}`;
+    BizTrackCSV.exportRecordsToCSV({
+        filename: "biztrack_expense_table.csv",
+        records: transactions,
+        columns: transactionColumns,
+    });
 }

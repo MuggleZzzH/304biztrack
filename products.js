@@ -251,36 +251,20 @@ function performSearch() {
 
 
 function exportToCSV() {
-  const productsToExport = products.map(product => {
-      return {
-        prodID: product.prodID,
-        prodName: product.prodName,
-        prodDesc: product.prodDesc,
-        prodCategory: product.prodCat,
-        prodPrice: product.prodPrice.toFixed(2),
-        QtySold: product.prodSold,
-      };
+  const productColumns = [
+    { header: "Product ID", value: (product) => product.prodID },
+    { header: "Product Name", value: (product) => product.prodName },
+    { header: "Description", value: (product) => product.prodDesc },
+    { header: "Category", value: (product) => product.prodCat },
+    { header: "Price", value: (product) => Number(product.prodPrice || 0).toFixed(2) },
+    { header: "Units Sold", value: (product) => product.prodSold },
+  ];
+
+  BizTrackCSV.exportRecordsToCSV({
+    filename: "biztrack_product_table.csv",
+    records: products,
+    columns: productColumns,
   });
-
-  const csvContent = generateCSV(productsToExport);
-
-  const blob = new Blob([csvContent], { type: 'text/csv' });
-
-  const link = document.createElement('a');
-  link.href = window.URL.createObjectURL(blob);
-  link.download = 'biztrack_product_table.csv';
-
-  document.body.appendChild(link);
-  link.click();
-
-  document.body.removeChild(link);
-}
-
-function generateCSV(data) {
-  const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(order => Object.values(order).join(','));
-
-  return `${headers}\n${rows.join('\n')}`;
 }
 
 init();
