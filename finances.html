@@ -59,6 +59,12 @@
                     <span>Help</span>
                 </a>
             </li>
+            <li>
+                <a href="./privacy.html">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Privacy Policy</span>
+                </a>
+            </li>
             <li class="logout">
                 <a href="./about.html">
                     <i class="fa-solid fa-users-line"></i>
@@ -99,7 +105,13 @@
                 <h3 class="main-title">Expenses</h3>
                 <div class="finance-button">
                     <button class="add-button" onclick="openForm()">Add Expense</button>
-                    <button class="download-button" onclick="exportToCSV()">Export to CSV</button>
+                    <button
+                        class="download-button"
+                        onclick="exportToCSV()"
+                        aria-label="Export expenses as a CSV file"
+                    >
+                        Export to CSV
+                    </button>
                 </div>
             </div>
 

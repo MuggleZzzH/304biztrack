@@ -59,6 +59,12 @@
                     <span>Help</span>
                 </a>
             </li>
+            <li>
+                <a href="./privacy.html">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Privacy Policy</span>
+                </a>
+            </li>
             <li class="logout">
                 <a href="./about.html">
                     <i class="fa-solid fa-users-line"></i>
@@ -99,7 +105,13 @@
                 <h3 class="main-title">Products</h3>
                 <div class="product-button">
                     <button class="add-button" onclick="openForm()">Add Product</button>
-                    <button class="download-button" onclick="exportToCSV()">Download CSV</button>
+                    <button
+                        class="download-button"
+                        onclick="exportToCSV()"
+                        aria-label="Download products as a CSV file"
+                    >
+                        Download CSV
+                    </button>
                 </div>
             </div>
             <div class="form-popup">
