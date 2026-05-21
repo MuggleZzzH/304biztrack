@@ -12,6 +12,10 @@ describe("BizTrackCSV", () => {
 
     expect(csv.escapeCSVCell('A "quoted", value')).toBe('"A ""quoted"", value"');
     expect(csv.escapeCSVCell("=SUM(A1:A2)")).toBe('"\'=SUM(A1:A2)"');
+    expect(csv.escapeCSVCell(" \t=SUM(A1:A2)")).toBe('"\' \t=SUM(A1:A2)"');
+    expect(csv.escapeCSVCell("\n@HYPERLINK(\"https://example.com\")")).toBe(
+      '"\'\n@HYPERLINK(""https://example.com"")"'
+    );
     expect(csv.escapeCSVCell(null)).toBe('""');
   });
 

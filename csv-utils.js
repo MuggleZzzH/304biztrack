@@ -29,7 +29,9 @@
    * OWASP identifies CSV Injection / Formula Injection as a risk when
    * untrusted user input is embedded in spreadsheet-compatible files. Values
    * beginning with characters such as "=", "+", "-", or "@" may be interpreted
-   * as formulas by spreadsheet applications.
+   * as formulas by spreadsheet applications. The check also allows leading
+   * whitespace because attackers can hide the formula trigger after spaces,
+   * tabs, or line breaks.
    *
    * Note:
    * This application exports CSV primarily for human viewing in spreadsheet
@@ -37,7 +39,7 @@
    * standard CSV quoting. This makes the value display as text in common
    * spreadsheet tools while preserving readability.
    */
-  const FORMULA_INJECTION_PATTERN = /^[=+\-@]/;
+  const FORMULA_INJECTION_PATTERN = /^\s*[=+\-@]/;
 
   /**
    * Converts nullish values into empty strings and all other values into text.
@@ -68,9 +70,10 @@
    * it.
    *
    * Security rationale:
-   * If a normalized cell begins with a formula-triggering character, a single
-   * quote is prepended before CSV quoting. This reduces the likelihood that
-   * spreadsheet software will interpret the cell as a formula.
+   * If a normalized cell begins with a formula-triggering character, allowing
+   * harmless-looking leading whitespace, a single quote is prepended before CSV
+   * quoting. This reduces the likelihood that spreadsheet software will
+   * interpret the cell as a formula.
    *
    * @param {*} value - Raw cell value.
    * @returns {string} Escaped CSV cell text.
